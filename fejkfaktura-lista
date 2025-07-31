@@ -1,0 +1,102 @@
+;(function(){
+  'use strict';
+  const todayKey = 'fakeInvoices_'+new Date().toISOString().slice(0,10);
+  const loadData  = ()=>JSON.parse(localStorage.getItem(todayKey)||'[]');
+  const saveData  = d=>localStorage.setItem(todayKey,JSON.stringify(d));
+  const clearData = ()=>localStorage.removeItem(todayKey);
+
+  function renderPanel(data){
+    let old=document.getElementById('fake-invoice-panel');
+    if(old) old.remove();
+    let panel=document.createElement('div');
+    panel.id='fake-invoice-panel';
+    panel.style.cssText='position:fixed;top:10%;right:10px;width:420px;max-height:80vh;overflow:auto;background:white;border:1px solid #888;padding:10px;font-size:14px;z-index:9999;';
+    let t=document.createElement('table');
+    t.style.cssText='width:100%;border-collapse:collapse;table-layout:fixed;';
+    data.forEach((d,i)=>{
+      let r=document.createElement('tr');
+      r.innerHTML=
+        '<td style="padding:4px;width:30px;text-align:center;">'+
+          '<input type="checkbox" '+(d.done?'checked':'')+' data-idx="'+i+'">'+
+        '</td>'+
+        '<td style="padding:4px;width:40%;word-break:break-word;">'+d.supplier+'</td>'+
+        '<td style="padding:4px;width:30%;word-break:break-word;">'+d.invNo+'</td>'+
+        '<td style="padding:4px;width:30%;word-break:break-word;">'+d.date+'</td>';
+      t.appendChild(r);
+    });
+    panel.appendChild(t);
+    panel.addEventListener('change',e=>{
+      if(e.target.type==='checkbox'){
+        let idx=+e.target.dataset.idx;
+        data[idx].done=e.target.checked;
+        saveData(data);
+      }
+    });
+
+    let btns=document.createElement('div');
+    btns.style.cssText='margin-top:8px;display:flex;gap:8px;';
+
+    let be=document.createElement('button');
+    be.textContent='Exportera CSV';
+    be.style.cursor='pointer';
+    be.onclick=e=>{
+      e.preventDefault();
+      let L=['Leverantör,Fakturanr,Datum,Avslutad'];
+      data.forEach(d=>L.push([d.supplier,d.invNo,d.date,d.done?'JA':'NEJ'].join(',')));
+      let B=new Blob([L.join('\n')],{type:'text/csv'});
+      let A=document.createElement('a');
+      A.href=URL.createObjectURL(B);
+      A.download='fake_invoices_'+new Date().toISOString().slice(0,10)+'.csv';
+      document.body.appendChild(A);
+      A.click();
+      document.body.removeChild(A);
+      URL.revokeObjectURL(A.href);
+    };
+    btns.appendChild(be);
+
+    let bc=document.createElement('button');
+    bc.textContent='Töm lista';
+    bc.style.cursor='pointer';
+    bc.onclick=e=>{
+      e.preventDefault();
+      clearData();
+      renderPanel([]);
+    };
+    btns.appendChild(bc);
+
+    let bx=document.createElement('button');
+    bx.textContent='Stäng';
+    bx.style.cursor='pointer';
+    bx.onclick=e=>{
+      e.preventDefault();
+      panel.remove();
+    };
+    btns.appendChild(bx);
+
+    panel.appendChild(btns);
+    document.body.appendChild(panel);
+  }
+
+  function tryProcess(){
+    let s=document.getElementById('form-supplierinvoice-supplierField'),
+        n=document.getElementById('form-supplierinvoice-invoiceNumber'),
+        d=document.getElementById('form-supplierinvoice-invoiceDate');
+    if(!s||!n||!d) return;
+    let it={
+      supplier:s.value.trim()||s.getAttribute('data-model-value'),
+      invNo:n.value.trim()||n.getAttribute('data-model-value'),
+      date:d.value.trim()||d.getAttribute('data-model-value'),
+      done:false
+    };
+    let D=loadData();
+    if(!D.some(i=>i.supplier===it.supplier&&i.invNo===it.invNo)){
+      D.push(it);
+      saveData(D);
+    }
+    renderPanel(D);
+  }
+
+  tryProcess();
+  let F=document.getElementById('form-supplierinvoice');
+  if(F) new MutationObserver(tryProcess).observe(F,{childList:true,subtree:true});
+})();
